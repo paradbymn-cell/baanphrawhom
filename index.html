@@ -79,9 +79,10 @@
   var deferred=null;
   window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferred=e;document.getElementById('install').classList.remove('hide');});
   document.getElementById('install').addEventListener('click',function(){if(deferred){deferred.prompt();deferred=null;}});
-  // เปิดจากไอคอนบนหน้าจอ → พาเข้า LINE ทันที (ถ้าไม่เปิด ให้กดปุ่มเอง)
-  if(standalone){
-    document.getElementById('status').textContent='กำลังเปิด LINE…';
+  // เปิดจากในแอป LINE (เช่น ริชเมนู) หรือจากไอคอนบนหน้าจอ → พาเข้าระบบทันที (ถ้าไม่เปิด ให้กดปุ่มเอง)
+  var inLine=/\bLine\//i.test(ua);
+  if(standalone||inLine){
+    document.getElementById('status').textContent=inLine?'กำลังเข้าสู่ระบบ…':'กำลังเปิด LINE…';
     setTimeout(function(){location.href=document.getElementById('open').href;},350);
     setTimeout(function(){document.getElementById('status').textContent='ถ้ายังไม่เปิด แตะปุ่มสีเขียวด้านบน';},2500);
   }
