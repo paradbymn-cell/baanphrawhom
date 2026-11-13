@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#2f6b2a">
+<title>บ้านพร้าวหอม · ระบบพนักงาน</title>
+<link rel="icon" type="image/png" href="favicon-48.png">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:#fff8ea radial-gradient(130% 55% at 50% 118%,#d9ebb8 0 55%,transparent 56%) fixed;color:#3b2a1e;font:16px/1.6 system-ui,"Noto Sans Thai",Tahoma,sans-serif}
+#loading{max-width:420px;margin:0 auto;padding:12vh 16px 24px;text-align:center}
+.card{background:#fffef8;border:1px solid #e6dcc3;border-radius:22px;padding:26px 20px;box-shadow:0 6px 24px #2f6b2a14}
+.logo{width:110px;height:110px;border-radius:26px;display:block;margin:0 auto 8px}
+h1{font-size:22px;margin:4px 0;color:#2f6b2a}
+p{color:#7a6a55;margin:6px 0}
+#status{color:#3b2a1e;font-weight:600;min-height:26px}
+.dot{display:inline-block;width:14px;height:14px;border:2px solid #2f6b2a;border-right-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-right:8px;vertical-align:-2px}
+@keyframes spin{to{transform:rotate(360deg)}}
+#error{color:#a3392f;white-space:pre-line;font-size:15px}
+button{border:0;background:#2f6b2a;color:#fff;font:inherit;font-weight:700;border-radius:14px;padding:14px 20px;cursor:pointer;width:100%;min-height:52px;margin-top:10px}
+iframe{border:0;position:fixed;inset:0;width:100%;height:100%;height:100dvh;background:#fff8ea}
+.small{font-size:13px}
+</style>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js" defer></script>
+</head>
+<body>
+<main id="loading">
+  <div class="card">
+    <img class="logo" src="icon-192.png" alt="บ้านพร้าวหอม" width="110" height="110">
+    <h1>ระบบพนักงาน</h1>
+    <p>บ้านพร้าวหอม × นายพันลูกชิ้นปั้นสด</p>
+    <p id="status"><span class="dot"></span>กำลังเชื่อมต่อ LINE…</p>
+    <p id="error" role="alert"></p>
+    <button id="retry" type="button" hidden>ลองอีกครั้ง</button>
+    <p class="small">เข้าสู่ระบบด้วยบัญชี LINE ที่ลงทะเบียนกับร้าน</p>
+  </div>
+</main>
+<iframe id="portal" title="ระบบพนักงาน" hidden allow="clipboard-write"></iframe>
+<script>
+'use strict';
+const LIFF_ID='2007214118-5Kk3WLcj';
+const APP_URL='https://script.google.com/macros/s/AKfycbxjKNC848tkYgFzLnO5w9MikagIOC0-oMnbAvtIx6jbWp4kxNVcvPxvY1WvWr57PzV-Cg/exec';
+// Google เปลี่ยนเลขกลางโดเมน (-0lu- / -1lu- / …) ตามบัญชี Google ที่เครื่องนั้นเคยเข้าไว้ จึงรับได้ทุกเลข แต่ต้องเป็นสคริปต์ของร้านเท่านั้น
+const APP_ORIGIN_RE=/^https:\/\/n-oumgrl36sfnlqklsxrtatfxpwnp7httuafnytbq-\d+lu-script\.googleusercontent\.com$/;
+const nonce=(crypto.randomUUID?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join('')).replace(/-/g,'');
+let idToken='',authenticated=false,bridgeWindow=null,bridgeOrigin='',waitingTimer=null;
+const $=id=>document.getElementById(id);
+const status=$('status'),error=$('error'),retry=$('retry'),portal=$('portal');
+function sendIdentity(){if(bridgeWindow&&bridgeOrigin&&idToken)bridgeWindow.postMessage({type:'BC_LINE_TOKEN',nonce,idToken},bridgeOrigin);}
+retry.onclick=()=>location.reload();
+window.addEventListener('message',event=>{
+  if(!APP_ORIGIN_RE.test(event.origin)||!event.source||event.data?.nonce!==nonce)return;
+  if(event.data.type==='BC_READY'){bridgeWindow=event.source;bridgeOrigin=event.origin;sendIdentity();}
+  if(event.data.type==='BC_PROGRESS'){status.textContent=String(event.data.message||'กำลังโหลดข้อมูลร้าน…');}
+  if(event.data.type==='BC_AUTH_READY'){authenticated=true;idToken='';clearTimeout(waitingTimer);error.textContent='';retry.hidden=true;portal.hidden=false;$('loading').hidden=true;}
+  if(event.data.type==='BC_AUTH_ERROR'){error.textContent=String(event.data.message||'ไม่สามารถยืนยันตัวตนได้');status.textContent='กรุณาตรวจบัญชี LINE';retry.hidden=false;}
+});
+portal.src=APP_URL+'?bridge=1&nonce='+encodeURIComponent(nonce);
+window.addEventListener('DOMContentLoaded',async()=>{
+  try{
+    if(!window.liff)throw Error('โหลด LINE ไม่สำเร็จ กรุณาลองอีกครั้ง');
+    await liff.init({liffId:LIFF_ID,withLoginOnExternalBrowser:true});
+    if(!liff.isLoggedIn()){liff.login({redirectUri:location.href.split('#')[0]});return;}
+    idToken=liff.getIDToken();
+    if(!idToken)throw Error('ไม่พบหลักฐานยืนยันบัญชี LINE กรุณาเปิดจากเมนูใน LINE ใหม่');
+    status.textContent='กำลังตรวจสิทธิ์กับร้าน…';
+    sendIdentity();
+    waitingTimer=setTimeout(()=>{if(!authenticated){status.textContent='เว็บพนักงานตอบช้ากว่าปกติ';error.textContent='แตะ "ลองอีกครั้ง"\nถ้ายังไม่ได้ ให้ปิดหน้านี้แล้วเปิดจากเมนูใน LINE ใหม่';retry.hidden=false;}},25000);
+  }catch(e){idToken='';error.textContent=e.message||'เชื่อมต่อไม่สำเร็จ';status.textContent='ยังไม่ได้เข้าสู่ระบบ';retry.hidden=false;}
+});
+</script>
+</body>
+</html>
